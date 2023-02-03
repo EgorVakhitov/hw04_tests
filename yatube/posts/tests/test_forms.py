@@ -1,0 +1,78 @@
+import shutil
+import tempfile
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase, override_settings
+from django.urls import reverse
+from posts.forms import PostForm
+from posts.models import Group, Post
+
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
+
+User = get_user_model()
+
+
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
+class PostFormTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create(username='auth')
+        Group.objects.create(
+            title='Тестовая группа',
+            slug='Тестовый слаг',
+            description='Тестовое описание'
+        )
+        cls.post = Post.objects.create(
+            id='1',
+            author=cls.user,
+            text='Тестовый пост'
+        )
+        cls.form = PostForm()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(PostFormTests.user)
+
+    def test_create_post(self):
+        posts_count = Post.objects.count()
+        form_data = {
+            'text': 'Новый пост',
+        }
+        response = self.authorized_client.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, (reverse(
+            'posts:profile', kwargs={'username': 'auth'})))
+        self.assertEqual(Post.objects.count(), posts_count + 1)
+        self.assertTrue(
+            Post.objects.filter(
+                text='Новый пост').exists()
+        )
+
+    def test_edit_post(self):
+        posts_count = Post.objects.count()
+        form_data = {
+            'text': 'Измененный пост'
+        }
+        response = self.authorized_client.post(
+            (reverse('posts:post_edit', kwargs={'post_id': '1'})),
+            data=form_data,
+            follow=True
+        )
+        self.assertRedirects(response, (reverse(
+            'posts:post_detail', kwargs={'post_id': '1'})))
+        self.assertEqual(Post.objects.count(), posts_count)
+        self.assertTrue(
+            Post.objects.filter(
+                text='Измененный пост').exists()
+        )
