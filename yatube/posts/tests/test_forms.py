@@ -22,7 +22,6 @@ class PostFormTests(TestCase):
             description='Тестовое описание'
         )
         cls.post = Post.objects.create(
-            id='1',
             author=cls.user,
             text='Тестовый пост'
         )
@@ -61,12 +60,13 @@ class PostFormTests(TestCase):
             'text': 'Измененный пост'
         }
         response = self.authorized_client.post(
-            (reverse('posts:post_edit', kwargs={'post_id': '1'})),
+            (reverse('posts:post_edit',
+                     kwargs={'post_id': f'{self.post.id}'})),
             data=form_data,
             follow=True
         )
         self.assertRedirects(response, (reverse(
-            'posts:post_detail', kwargs={'post_id': '1'})))
+            'posts:post_detail', kwargs={'post_id': f'{self.post.id}'})))
         self.assertEqual(Post.objects.count(), posts_count)
         self.assertTrue(
             Post.objects.filter(
