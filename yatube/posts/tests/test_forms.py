@@ -2,15 +2,12 @@ import shutil
 import tempfile
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-from posts.forms import PostForm
-from posts.models import Group, Post
+
+from posts.models import Group, Post, User
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
-
-User = get_user_model()
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
@@ -29,7 +26,6 @@ class PostFormTests(TestCase):
             author=cls.user,
             text='Тестовый пост'
         )
-        cls.form = PostForm()
 
     @classmethod
     def tearDownClass(cls):

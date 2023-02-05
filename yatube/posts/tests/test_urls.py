@@ -1,10 +1,8 @@
-from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
-from posts.models import Group, Post
-
 from http import HTTPStatus
 
-User = get_user_model()
+from django.test import Client, TestCase
+
+from posts.models import Group, Post, User
 
 
 class PostsURLTests(TestCase):
@@ -13,7 +11,6 @@ class PostsURLTests(TestCase):
         super().setUpClass()
         cls.user = User.objects.create(username='auth')
         cls.post = Post.objects.create(
-            id='1',
             author=cls.user,
             text='Тестовый пост'
         )
@@ -32,7 +29,7 @@ class PostsURLTests(TestCase):
         field_urls = {
             '/': HTTPStatus.OK.value,
             '/group/test-slug/': HTTPStatus.OK.value,
-            '/posts/1/': HTTPStatus.OK.value,
+            f'/posts/{self.post.id}/': HTTPStatus.OK.value,
             '/profile/auth/': HTTPStatus.OK.value
         }
         for adress, expected in field_urls.items():
@@ -43,7 +40,7 @@ class PostsURLTests(TestCase):
     def test_url_exists_at_desired_location_for_authorized_only(self):
         field_urls = {
             '/create/': HTTPStatus.OK.value,
-            '/posts/1/edit/': HTTPStatus.OK.value
+            f'/posts/{self.post.id}/edit/': HTTPStatus.OK.value
         }
         for adress, expected in field_urls.items():
             with self.subTest(adress=adress):
@@ -53,7 +50,8 @@ class PostsURLTests(TestCase):
     def test_url_redirect_anonymous_on_admin_login(self):
         field_urls = {
             '/create/': '/auth/login/?next=/create/',
-            '/posts/1/edit/': '/auth/login/?next=/posts/1/edit/'
+            f'/posts/{self.post.id}/edit/':
+            f'/auth/login/?next=/posts/{self.post.id}/edit/'
         }
         for adress, expected in field_urls.items():
             with self.subTest(adress=adress):
@@ -68,10 +66,10 @@ class PostsURLTests(TestCase):
         templates_urls = {
             '/': 'posts/index.html',
             '/group/test-slug/': 'posts/group_list.html',
-            '/posts/1/': 'posts/post_detail.html',
+            f'/posts/{self.post.id}/': 'posts/post_detail.html',
             '/profile/auth/': 'posts/profile.html',
             '/create/': 'posts/create_post.html',
-            '/posts/1/edit/': 'posts/create_post.html'
+            f'/posts/{self.post.id}/edit/': 'posts/create_post.html'
         }
         for adress, expected in templates_urls.items():
             with self.subTest(adress=adress):

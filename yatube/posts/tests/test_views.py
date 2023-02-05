@@ -1,10 +1,8 @@
 from django import forms
-from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
-from posts.models import Group, Post
 
-User = get_user_model()
+from posts.models import Group, Post, User
 
 
 class PostPagesTests(TestCase):
@@ -17,8 +15,7 @@ class PostPagesTests(TestCase):
             slug='test-slug',
             description='Тестовое описание'
         )
-        Post.objects.create(
-            id='1',
+        cls.post = Post.objects.create(
             author=cls.user,
             text='Тестовый пост',
             group=cls.group
@@ -36,9 +33,13 @@ class PostPagesTests(TestCase):
             'posts/group_list.html',
             (reverse('posts:profile', kwargs={'username': 'auth'})):
             'posts/profile.html',
-            (reverse('posts:post_detail', kwargs={'post_id': '1'})):
+            (reverse('posts:post_detail',
+                     kwargs={'post_id': f'{self.post.id}'}
+                     )):
             'posts/post_detail.html',
-            (reverse('posts:post_edit', kwargs={'post_id': '1'})):
+            (reverse('posts:post_edit', kwargs={'post_id':
+                                                f'{self.post.id}'
+                                                })):
             'posts/create_post.html',
             reverse('posts:post_create'): 'posts/create_post.html'
         }
@@ -76,14 +77,14 @@ class PostPagesTests(TestCase):
 
     def test_post_detail_show_correct_context(self):
         response = self.authorized_client.get(
-            reverse('posts:post_detail', kwargs={'post_id': '1'})
+            reverse('posts:post_detail', kwargs={'post_id': f'{self.post.id}'})
         )
-        expected_context = Post.objects.get(id='1')
+        expected_context = Post.objects.get(id=f'{self.post.id}')
         self.assertEqual(response.context['post'], expected_context)
 
     def test_post_edit_show_correct_context(self):
         response = self.authorized_client.get(
-            reverse('posts:post_edit', kwargs={'post_id': '1'})
+            reverse('posts:post_edit', kwargs={'post_id': f'{self.post.id}'})
         )
         form_fields = {
             'text': forms.fields.CharField,
@@ -143,13 +144,12 @@ class PaginatorViewsTest(TestCase):
             slug='test-slug',
             description='Тестовое описание'
         )
+        post_list = []
         for i in range(1, 14):
-            Post.objects.create(
-                id=f'{i}',
-                author=cls.user,
-                text='Тестовый пост',
-                group=cls.group
+            post_list.append(
+                Post(author=cls.user, text='Тестовый пост', group=cls.group)
             )
+        cls.posts = Post.objects.bulk_create(post_list)
 
     def setUp(self):
         self.guest_client = Client()
