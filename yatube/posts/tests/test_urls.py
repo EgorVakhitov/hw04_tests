@@ -1,6 +1,8 @@
 from http import HTTPStatus
+from django.core.cache import cache
 
 from django.test import Client, TestCase
+
 from posts.models import Group, Post, User
 
 
@@ -23,6 +25,7 @@ class PostsURLTests(TestCase):
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(PostsURLTests.user)
+        cache.clear()
 
     def test_url_exists_at_desired_location_for_everyone(self):
         field_urls = {
@@ -50,7 +53,8 @@ class PostsURLTests(TestCase):
         field_urls = {
             '/create/': '/auth/login/?next=/create/',
             f'/posts/{self.post.id}/edit/':
-            f'/auth/login/?next=/posts/{self.post.id}/edit/'
+            f'/auth/login/?next=/posts/{self.post.id}/edit/',
+            
         }
         for adress, expected in field_urls.items():
             with self.subTest(adress=adress):

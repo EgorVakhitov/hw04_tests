@@ -1,9 +1,18 @@
+import shutil
+import tempfile
+from django.core.cache import cache
+
 from django import forms
-from django.test import Client, TestCase
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+
 from posts.models import Group, Post, User
 
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostPagesTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -14,16 +23,36 @@ class PostPagesTests(TestCase):
             slug='test-slug',
             description='Тестовое описание'
         )
+        cls.small_gif = (            
+             b'\x47\x49\x46\x38\x39\x61\x02\x00'
+             b'\x01\x00\x80\x00\x00\x00\x00\x00'
+             b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+             b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+             b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+             b'\x0A\x00\x3B'
+        )
+        cls.uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=cls.small_gif,
+            content_type='image/gif'
+        )
         cls.post = Post.objects.create(
             author=cls.user,
             text='Тестовый пост',
-            group=cls.group
+            group=cls.group,
+            image = cls.uploaded
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(PostPagesTests.user)
+        cache.clear()
 
     def test_pages_uses_correct_template(self):
         templates_pages_names = {
@@ -125,12 +154,41 @@ class PostPagesTests(TestCase):
         form_fields = {
             reverse(
                 "posts:group_list", kwargs={"slug": self.group.slug}
-            ): Post.objects.exclude(group=PostPagesTests.group),
+            ): Post.objects.exclude(group=self.group),
         }
         for value, expected in form_fields.items():
             with self.subTest(value=value):
                 response = self.authorized_client.get(value)
                 self.assertNotIn(expected, response.context['page_obj'])
+
+    def test_check_image_in_context(self):
+        templates_pages_names = {
+            reverse('posts:index'): 'page_obj',
+            (reverse('posts:group_list', kwargs={'slug': 'test-slug'})):
+            'page_obj',
+            (reverse('posts:profile', kwargs={'username': 'auth'})):
+            'page_obj'
+        }
+        for value, context in templates_pages_names.items():
+            with self.subTest(value=value):
+                response = self.authorized_client.get(value)
+                self.assertEqual(self.post.image, response.context[context][0].image)
+
+    def test_check_image_in_post_detail(self):
+        response = self.authorized_client.get(reverse('posts:post_detail', kwargs={'post_id': f'{self.post.id}'}))
+        self.assertEqual(self.post.image, response.context['post'].image)
+
+    def test_index_cache(self):
+        response_1 = self.client.get(reverse('posts:index'))
+        Post.objects.create(
+            author=self.user,
+            text = 'Тестовый текст'
+        )
+        response_2 = self.client.get(reverse('posts:index'))
+        self.assertEqual(response_1.content,response_2.content)
+        cache.clear()
+        response = self.client.get(reverse('posts:index'))
+        self.assertNotEqual(response.content,response_2.content)
 
 
 class PaginatorViewsTest(TestCase):
@@ -154,6 +212,7 @@ class PaginatorViewsTest(TestCase):
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(PaginatorViewsTest.user)
+        cache.clear()
 
     def test_first_index_page_contains_ten_records(self):
         response = self.client.get(reverse('posts:index'))
@@ -186,3 +245,4 @@ class PaginatorViewsTest(TestCase):
             reverse('posts:profile', kwargs={'username': 'auth'}) + '?page=2'
         )
         self.assertEqual(len(response.context['page_obj']), 3)
+
