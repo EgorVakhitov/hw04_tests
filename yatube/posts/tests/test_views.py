@@ -246,3 +246,37 @@ class PaginatorViewsTest(TestCase):
         )
         self.assertEqual(len(response.context['page_obj']), 3)
 
+class FollowViewsTest(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user_follower = User.objects.create(username='follower')
+        cls.user_unfollower = User.objects.create(username='unfollower')
+        cls.user_following = User.objects.create(username='following')
+        Post.objects.create(author=cls.user_following, text='Тестовый пост')
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.user_follower)
+        cache.clear()
+    
+    def test_profile_follow_and_unfollow(self):
+        response = self.authorized_client.get(reverse('posts:follow_index'))
+        self.assertEqual(len(response.context['page_obj']), 0)
+        #Авторизованный пользователь может подписываться на пользователей
+        response = self.authorized_client.get(reverse('posts:profile_follow', kwargs={'username': 'following'}), follow=True)
+        self.assertEqual(len(response.context['page_obj']), 1)
+        #Новая запись пользователя появляется в ленте тех, кто на него подписан
+        post = Post.objects.create(author=self.user_following, text='Тестовый пост')
+        cache.clear()
+        response = self.authorized_client.get(reverse('posts:follow_index'))
+        self.assertEqual(len(response.context['page_obj']), 2)
+        #Авторизованный пользователь может удалять пользователей из подписок
+        response = self.authorized_client.get(reverse('posts:profile_unfollow', kwargs={'username': 'following'}), follow=True)
+        self.assertEqual(len(response.context['page_obj']), 0)
+        #Новая запись пользователя появляется в ленте тех, кто на него подписан и не появляется в ленте тех, кто не подписан.
+        self.authorized_client.force_login(self.user_unfollower)
+        response = self.authorized_client.get(reverse("posts:follow_index"))
+        self.assertNotIn(post, response.context["page_obj"])
+        
