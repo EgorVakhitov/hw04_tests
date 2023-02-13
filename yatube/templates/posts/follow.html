@@ -10,7 +10,7 @@
 {% block content%}
     {% include 'posts/includes/switcher.html' %}
       <div class="container py-5">     
-        <h1>Последние обновления на сайте</h1>
+        <h1>Ваши подписки</h1>
         <article>
           {% for post in page_obj %}
             <ul>
@@ -33,6 +33,5 @@
           {% endfor %} 
           {% include 'posts/includes/paginator.html' %}
         </article>
-        <!-- под последним постом нет линии -->
       </div>  
 {% endblock %} 
